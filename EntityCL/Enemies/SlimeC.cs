@@ -13,34 +13,24 @@ namespace EntityCL.Enemies
 {
     public class SlimeC : EnemyAC
     {
-        readonly Random random = new();
+        private readonly Random random = new();
         private int Speed { get; set; }
-        public SlimeC(Player mainPlayer) : base(mainPlayer)
-        {
-            MAXHealthPoints = 1;
-            HealthPoints = MAXHealthPoints;
-            AttackDamage = 1;
-            EntityName = "Acid Slime";
-            SoulCoins = 1;
-            Strength = 0;
-            Speed = 1;
-            if (random.Next(-1, 1) == -1)
-            {
-                RotateWay.ScaleX = -1;
-            }
-            else
-            {
-                RotateWay.ScaleX = 1;
-            }
 
-            EntityRect.Tag = "slimeTag";
-            EntityRect.Height = 30;
-            EntityRect.Width = 35;
-            ImageBrush SlimeImage = new ImageBrush();
-            SlimeImage.ImageSource = new BitmapImage(new Uri("pack://application:,,,/Images/Slime/GreenSlime.png"));
-            EntityRect.Fill = SlimeImage;
+        private const int GAME_FIELD_WIDTH = 1540;
+        private const int GAME_FIELD_PADDING = 5;
+        private const int WALL_HIT_OFFSET = 5;
+
+        public SlimeC(Player mainPlayer) 
+            : this(mainPlayer, 35, 30, 1) { }
+
+        public SlimeC(Player mainPlayer, int width, int height, int speed) 
+            : base(mainPlayer)
+        {
+            Speed = speed;
+            InitializeSlime(width, height);
         }
-        public SlimeC(Player mainPlayer, int width, int height, int speed) : base(mainPlayer)
+
+        private void InitializeSlime(int width, int height)
         {
             MAXHealthPoints = 1;
             HealthPoints = MAXHealthPoints;
@@ -48,77 +38,59 @@ namespace EntityCL.Enemies
             EntityName = "Acid Slime";
             SoulCoins = 1;
             Strength = 0;
-            Speed = speed;
-            if (random.Next(-1, 1) == -1)
-            {
-                RotateWay.ScaleX = -1;
-            }
-            else
-            {
-                RotateWay.ScaleX = 1;
-            }
+
+            RotateWay.ScaleX = (random.Next(0, 2) * 2 - 1); // Генерує -1 або 1
 
             EntityRect.Tag = "slimeTag";
             EntityRect.Height = height;
             EntityRect.Width = width;
-            ImageBrush Image = new ImageBrush();
-            Image.ImageSource = new BitmapImage(new Uri("pack://application:,,,/Images/Slime/GreenSlime.png"));
-            EntityRect.Fill = Image;
+            EntityRect.Fill = new ImageBrush
+            {
+                ImageSource = new BitmapImage(new Uri("pack://application:,,,/Images/Slime/GreenSlime.png"))
+            };
         }
+
         public override void SetEntityBehavior(List<Rectangle> itemRemover)
         {
             SetHitbox();
             Moving();
             Attack();
             Death(itemRemover);
-
             TakeDamageFrom();
         }
+
         public override void Moving()
         {
-            if (!IsDead)
+            if (IsDead) return;
+
+            double currentX = Canvas.GetLeft(EntityRect);
+            double newX = currentX + (Speed * RotateWay.ScaleX);
+
+            if (newX > GAME_FIELD_WIDTH - EntityRect.Width || newX < GAME_FIELD_PADDING)
             {
-                if (RotateWay.ScaleX == 1)
-                {
-                    if (Canvas.GetLeft(EntityRect) > (1540 - (int)EntityRect.Width))
-                    {
-                        WallHit();
-                    }
-                    Canvas.SetLeft(EntityRect, Canvas.GetLeft(EntityRect) + Speed);
-                }
-                else
-                {
-                    if (Canvas.GetLeft(EntityRect) < 5)
-                    {
-                        WallHit();
-                    }
-                    Canvas.SetLeft(EntityRect, Canvas.GetLeft(EntityRect) - Speed);
-                }
+                WallHit();
+                return;
             }
+
+            Canvas.SetLeft(EntityRect, newX);
         }
+
         public override void WallHit()
         {
-            if (RotateWay.ScaleX == 1)
-            {
-                Canvas.SetLeft(EntityRect, Canvas.GetLeft(EntityRect) - 5);
-            }
-            else
-            {
-                Canvas.SetLeft(EntityRect, Canvas.GetLeft(EntityRect) + 5);
-            }
             RotateWay.ScaleX *= -1;
+            Canvas.SetLeft(EntityRect, Canvas.GetLeft(EntityRect) + (WALL_HIT_OFFSET * RotateWay.ScaleX));
         }
+
         public override void Attack()
         {
-            if (!IsDead)
-            {
-                if (EntityHitBox.IntersectsWith(MainPlayer.EntityHitBox))
-                {
-                    HealthPoints--;
+            if (IsDead) return;
 
-                    MainPlayer.TakeDamageFrom(this);
-                }
+            if (EntityHitBox.IntersectsWith(MainPlayer.EntityHitBox))
+            {
+                HealthPoints--;
+                MainPlayer.TakeDamageFrom(this);
             }
         }
     }
 }
+
