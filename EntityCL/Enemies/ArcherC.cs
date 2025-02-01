@@ -14,8 +14,19 @@ namespace EntityCL.Enemies
 {
     public class ArcherC : EnemyAC
     {
-        public Arrow? arrow { get; set; }
-        public ArcherC(Player mainPlayer) : base(mainPlayer)
+        public Arrow? arrow { get; private set; }
+        private readonly ArcherCombat _combat;
+        private readonly IArrowFactory _arrowFactory;
+
+        public ArcherC(Player mainPlayer, IArrowFactory arrowFactory) : base(mainPlayer)
+        {
+            _arrowFactory = arrowFactory;
+            _combat = new ArcherCombat(this, _arrowFactory);
+
+            InitializeEntity();
+        }
+
+        private void InitializeEntity()
         {
             MAXHealthPoints = 5;
             HealthPoints = MAXHealthPoints;
@@ -29,52 +40,60 @@ namespace EntityCL.Enemies
             EntityRect.Tag = "archerTag";
             EntityRect.Height = 50;
             EntityRect.Width = 50;
-            ImageBrush ArcherImage = new ImageBrush();
-            ArcherImage.ImageSource = new BitmapImage(new Uri("pack://application:,,,/Images/Archer/ArcherEnemy.png"));
-            EntityRect.Fill = ArcherImage;
+            EntityRect.Fill = new ImageBrush
+            {
+                ImageSource = new BitmapImage(new Uri("pack://application:,,,/Images/Archer/ArcherEnemy.png"))
+            };
         }
-        public void CreateArrow(Canvas GameScreen, Player MainPlayer)
-        {
-            if (!IsDead) arrow = new Arrow(this, GameScreen, MainPlayer);
-        }
+
         public override void SetEntityBehavior(List<Rectangle> itemRemover)
         {
             SetHitbox();
             LookToPlayer(MainPlayer.EntityRect);
             Moving();
-            arrow?.SetArrowHitbox();
+            _combat.HandleArrowMovement(itemRemover);
 
             Death(itemRemover);
             TakeDamageFrom();
-
-            if (arrow != null)
-            {
-                arrow.Flying(arrow.TargetAimX, arrow.TargetAimY, itemRemover);
-                arrow.WallHit(itemRemover);
-            }
         }
+
+        public void ShootArrow(Canvas gameScreen)
+        {
+            _combat.TryShootArrow(gameScreen, MainPlayer);
+        }
+
         public override void Moving()
         {
-            if (CanMove && Math.Abs(Canvas.GetLeft(EntityRect) - Canvas.GetLeft(MainPlayer.EntityRect)) < 100 && Math.Abs(Canvas.GetTop(EntityRect) - Canvas.GetTop(MainPlayer.EntityRect)) < 100)
-            {
-                base.Moving();
+            if (!CanMove || !IsPlayerNearby()) return;
 
-                if (RotateWay.ScaleX == 1) Canvas.SetLeft(EntityRect, Canvas.GetLeft(EntityRect) - 1);
-                if (RotateWay.ScaleX == -1) Canvas.SetLeft(EntityRect, Canvas.GetLeft(EntityRect) + 1);
-
-                if (Canvas.GetTop(EntityRect) > Canvas.GetTop(MainPlayer.EntityRect) + MainPlayer.EntityRect.Height)
-                {
-                    Canvas.SetTop(EntityRect, Canvas.GetTop(EntityRect) + 1);
-                }
-                if (Canvas.GetTop(EntityRect) < Canvas.GetTop(MainPlayer.EntityRect) - MainPlayer.EntityRect.Height)
-                {
-                    Canvas.SetTop(EntityRect, Canvas.GetTop(EntityRect) - 1);
-                }
-            }
+            base.Moving();
+            MoveTowardsPlayer();
         }
+
+        private bool IsPlayerNearby()
+        {
+            double distanceX = Math.Abs(Canvas.GetLeft(EntityRect) - Canvas.GetLeft(MainPlayer.EntityRect));
+            double distanceY = Math.Abs(Canvas.GetTop(EntityRect) - Canvas.GetTop(MainPlayer.EntityRect));
+            return distanceX < 100 && distanceY < 100;
+        }
+
+        private void MoveTowardsPlayer()
+        {
+            if (RotateWay.ScaleX == 1)
+                Canvas.SetLeft(EntityRect, Canvas.GetLeft(EntityRect) - 1);
+            else if (RotateWay.ScaleX == -1)
+                Canvas.SetLeft(EntityRect, Canvas.GetLeft(EntityRect) + 1);
+
+            if (Canvas.GetTop(EntityRect) > Canvas.GetTop(MainPlayer.EntityRect) + MainPlayer.EntityRect.Height)
+                Canvas.SetTop(EntityRect, Canvas.GetTop(EntityRect) + 1);
+            else if (Canvas.GetTop(EntityRect) < Canvas.GetTop(MainPlayer.EntityRect) - MainPlayer.EntityRect.Height)
+                Canvas.SetTop(EntityRect, Canvas.GetTop(EntityRect) - 1);
+        }
+
         public override void WallHit()
         {
             CanMove = false;
         }
     }
 }
+
